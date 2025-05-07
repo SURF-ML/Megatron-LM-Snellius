@@ -1,0 +1,41 @@
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --partition=rome
+#SBATCH --ntasks-per-node=1
+#SBATCH --time=1:00:00
+#SBATCH --exclusive
+
+
+CONTAINER_URL=nvcr.io/nvidia/pytorch:25.04-py3
+CONTAINER_NAME=megatron-torch-2.7-nvcr.25-04.sif22
+
+CONTAINER_OUTPUT_PATH=$PROJECT_SPACE/containers/$CONTAINER_NAME
+
+export APPTAINER_TMPDIR=/dev/shm/$USER
+export APPTAINER_CACHEDIR=/scratch-shared/$USER/apptainer
+
+mkdir -p $APPTAINER_TMPDIR $APPTAINER_CACHEDIR $CONTAINER_OUTPUT_PATH
+
+# Define apptainer definition file inline for more flexibility
+TMP_CONTAINER_FILENAME=/dev/shm/$USER/megatron.def
+
+cat <<EOF > $TMP_CONTAINER_FILENAME
+Bootstrap: docker
+From: $CONTAINER_URL
+
+%post
+     export PIP_NO_CACHE_DIR=1
+     pip install nltk wandb
+     pip install transformers -v --no-deps
+     pip install dataset tokenizers sentencepiece protobuf tqdm regex pyyaml huggingface_hub --no-deps
+
+%environment
+    export LD_PRELOAD=
+
+EOF
+
+echo "Downloading $CONTAINER_URL to $CONTAINER_OUTPUT_PATH"
+apptainer build $CONTAINER_OUTPUT_PATH $TMP_CONTAINER_FILENAME
+
+rm $TMP_CONTAINER_FILENAME
+echo "Done building! Check out $CONTAINER_OUTPUT_PATH

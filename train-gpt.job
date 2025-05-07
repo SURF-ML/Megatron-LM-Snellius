@@ -1,0 +1,407 @@
+#!/bin/bash
+#SBATCH --job-name=train-gpt
+#SBATCH --cpus-per-task=16
+#SBATCH --ntasks-per-node=4
+#SBATCH --nodes=4
+#SBATCH --partition=gpu_h100
+#SBATCH --time=1:00:00
+#SBATCH --exclusive
+#SBATCH --gpus-per-node=4
+#SBATCH --output logs/%j.out
+#SBATCH --error logs/%j.err
+
+# This is a slurm script for training generative models on LUMI using
+# Megatron-LM pretrain_gpt.py. This script defines defaults for
+# training a FineWeb-like model (approx. 1.7B parameters) and is
+# intended to be reasonably easily modified for other model sizes
+# by editing the variables defined in the "MODEL AND PRETRAINING
+# CONFIGURATION" section below.
+#
+# Note that while the script defines default arguments for sbatch
+# in the #SBATCH comments above, you can override any of these on the
+# command line. For example, to run on 16 nodes:
+#
+#    sbatch --nodes 16 ./train.sh [...]
+
+######################################################################
+#
+# ENVIRONMENT SETUP AND GENERAL CONFIGURATION
+#
+# This section of the script sets up the execution environment (logs,
+# container, etc.) and configuration that is independent of the model
+# or pretraining setup. It should generally not be necessary to edit
+# this section, and you may wish to double-check that you understand
+# what you are doing before you do.
+#
+######################################################################
+
+# If this script is run without sbatch, invoke with sbatch here. This
+# also gives us an opportunity to make sure logs/ exists. (If the
+# directory where --output and/or --error are directed to doesn't
+# exist, the run will fail silently.)
+if [ -z $SLURM_JOB_ID ]; then
+    mkdir -p logs
+    sbatch "$0" "$@"
+    exit
+fi
+
+export PROJECT_SPACE=
+
+if [ -z "$PROJECT_SPACE" ]; then
+  echo "Error: PROJECT_SPACE is not set. Please set the project space path in this script. Example: export PROJECT_SPACE=/projects/0/prjsXXXX"
+  exit 1
+fi
+
+CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-04.sif
+
+# Bash "strict mode"
+# (see http://redsymbol.net/articles/unofficial-bash-strict-mode/)
+set -euo pipefail
+
+# When slurm reschedules a job that ended on node failure, it will run
+# with the same job ID, clobbering the original logs. Rename the logs
+# and include timestamp to avoid this.
+timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
+logfile_basename="${SLURM_JOB_NAME}-${SLURM_JOBID}-${timestamp}"
+#mv -f "logs/${SLURM_JOBID}.out" "logs/${logfile_basename}.out"
+#mv -f "logs/${SLURM_JOBID}.err" "logs/${logfile_basename}.err"
+
+# Check if this is a restared run and if so, print the failure
+# events/reasons for failed nodes. (This relies on "logs/latest.err"
+# pointing to the error log of the failed run.)
+if [[ -v SLURM_RESTART_COUNT ]]; then
+    failed_node=$(grep 'Node failure' logs/latest.err | awk '{print $NF}')
+    if [[ -z ${failed_node:+x} ]]; then
+        echo "RUN RESTARTED but no node failure logged"
+    else
+        failed_node="${failed_node//$'\n'/ }"
+        echo "RUN RESTARTED AFTER FAILURE OF NODE(s) $failed_node. Reason:"
+        sacctmgr show event where node="$failed_node" format="NodeName,TimeStart,TimeEnd,State,Reason%100"
+    fi
+fi
+
+# Symlink logs/latest.out and logs/latest.err for convenience and to
+# support the above check.
+#ln -sf "${logfile_basename}.out" "logs/latest.out"
+#ln -sf "${logfile_basename}.err" "logs/latest.err"
+
+# Modules are needed with the container we are using.
+module purge
+module load 2024 NCCL/2.22.3-GCCcore-13.3.0-CUDA-12.6.0
+
+# Directories to map into container
+BIND_DIRS="/scratch-shared/$USER,$PROJECT_SPACE"
+
+# Avoid conflicts with $HOME/.local
+export PYTHONUSERBASE=""
+
+# Compilers in the container
+export CC=gcc
+export CXX=g++
+
+# PATHS
+BASE_DIR="$PWD" #$SLURM_SUBMIT_DIR"
+OUTPUT_DIR="/scratch-shared/$USER/Megatron-LM/output"
+CHECKPOINT_PATH="$OUTPUT_DIR/checkpoints"
+TENSORBOARD_DIR="$OUTPUT_DIR/tensorboard/$SLURM_JOB_NAME-$SLURM_JOBID"
+
+mkdir -p "$OUTPUT_DIR" "$CHECKPOINT_PATH"    # This needs to exist
+
+# Script that is used to launch on GPU nodes
+LAUNCH_SCRIPT="$BASE_DIR/launch.sh"
+
+# Needed for sequence paralellism
+# (see https://github.com/NVIDIA/Megatron-LM/issues/533)
+export CUDA_DEVICE_MAX_CONNECTIONS=1
+
+export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+export MASTER_PORT=9999
+export WORLD_SIZE=$SLURM_NTASKS    # Note: only valid if ntasks==ngpus
+
+# OMP THREADING
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_NODE:-2}
+
+# This setting is reported to provide a performance improvement
+# (https://arxiv.org/pdf/2408.14090v1) but as of April 2025 is causing
+# training instability on LUMI with pipeline parallelism.
+# (see https://github.com/spyysalo/lumi-fineweb-replication/issues/1)
+#export NCCL_NCHANNELS_PER_PEER=32
+
+
+# DEBUGGING, INCREASE VERBOSITY IN LOGS
+# export MIOPEN_ENABLE_LOGGING=1
+export PYTHONWARNINGS=ignore
+# export TORCH_SHOW_CPP_STACKTRACES=1
+# export NCCL_DEBUG=INFO
+# export RCCL_KERNEL_COLL_TRACE_ENABLE=1
+# export NCCL_DEBUG_SUBSYS=ALL
+# export NCCL_DEBUG_FILE=$OUTPUT_DIR/nccl-debug-${SLURM_JOB_NAME}-${SLURM_JOBID}.log #Move verbose nccl logging to its own file
+export NVTE_DEBUG=0
+export NVTE_DEBUG_LEVEL=0
+
+######################################################################
+#
+# MODEL AND PRETRAINING CONFIGURATION
+#
+# This section sets variables that define the model and pretraining
+# configuration. These mostly correspond to command-line arguments to
+# Megatron-LM/pretrain_gpt.py, and when they do, the names should
+# match (e.g. the variable $GLOBAL_BATCH_SIZE gets passed as
+# --global-batch-size). This script is intended to be configurable by
+# redefining these variables.
+#
+######################################################################
+
+# DATA
+DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT_text_document"
+DATA_CACHE_PATH="/scratch-shared/$USER/megatron_cache"
+TOKENIZER_MODEL="gpt2"
+
+# MODEL
+# 1,713,735,680 (1.7B) parameters
+NUM_LAYERS=24
+HIDDEN_SIZE=2048
+FFN_HIDDEN_SIZE=$((4*HIDDEN_SIZE))
+NUM_ATTENTION_HEADS=32
+NUM_QUERY_GROUPS=32    # No GQA when NUM_QUERY_GROUPS=NUM_ATTENTION_HEADS
+TIE_WORD_EMBEDDINGS=1
+INIT_METHOD_STD=0.02
+SEQ_LENGTH=2048
+ROTARY_BASE=10000    # Default, recommend larger for higher seq len
+
+# PARALLELISM
+PIPELINE_MODEL_PARALLEL_SIZE=1
+TENSOR_MODEL_PARALLEL_SIZE=1
+CONTEXT_PARALLEL_SIZE=1
+NUM_LAYERS_PER_VIRTUAL_PIPELINE_STAGE=1
+PROFILE=0
+
+# OPTIMIZER
+ADAM_BETA1=0.9
+ADAM_BETA2=0.95
+ADAM_EPS=1e-8
+LR=3e-4
+MIN_LR=3e-5
+LR_WARMUP_ITERS=500
+CLIP_GRAD=1.0
+WEIGHT_DECAY=1e-1
+
+# TRAINING
+FSDP=0
+GLOBAL_BATCH_SIZE=64
+MICRO_BATCH_SIZE=4
+RECOMPUTATION=0
+TRAIN_TOKENS=350_000_000_000    # TRAIN_SAMPLES computed from this
+
+# SAVING AND EVALUATION
+LOG_INTERVAL=1
+SAVE_INTERVAL=500
+EVAL_INTERVAL=5000
+EVAL_ITERS=100
+
+######################################################################
+#
+# DERIVED CONFIGURATION SETTINGS
+#
+# The following settings are derived from the configuration above.
+# Do set these directly, as they will be overwritten here.
+#
+######################################################################
+
+# Check that variables are not set (sanity)
+confirm_unset() {
+    local varname="$1"
+    if [ -n "${!varname+x}" ]; then
+	echo "Error: variable '$varname' should not be set." >&2
+	exit 1
+    fi
+}
+confirm_unset "TRAIN_SAMPLES"
+confirm_unset "LR_WARMUP_SAMPLES"
+confirm_unset "LR_DECAY_SAMPLES"
+
+# Calculate TRAIN_SAMPLES from TRAIN_TOKENS
+TRAIN_TOKENS=${TRAIN_TOKENS//_}    # drop "_" for bash math
+TRAIN_SAMPLES=$((TRAIN_TOKENS/SEQ_LENGTH))
+
+# Set LR_WARMUP_SAMPLES and LR_DECAY_SAMPLES and based LR_WARMUP_ITERS
+# and TRAIN_SAMPLES
+LR_WARMUP_SAMPLES=$((LR_WARMUP_ITERS*GLOBAL_BATCH_SIZE))
+LR_DECAY_SAMPLES=$TRAIN_SAMPLES
+
+######################################################################
+#
+# BUILDING COMMAND-LINE ARGUMENTS
+#
+# The following builds the command-line arguments for
+# Megatron-LM/pretrain_gpt.py based on the variables defined above
+# (and optionally in any config given to the script). Note that some
+# arguments that are not expected to vary are hard-coded here.
+#
+######################################################################
+
+DATA_ARGS=(
+    --data-path "$DATA_PATH"
+    --data-cache-path "$DATA_CACHE_PATH"
+    --tokenizer-type HuggingFaceTokenizer
+    --tokenizer-model "$TOKENIZER_MODEL"
+    --make-vocab-size-divisible-by 128
+    --dataloader-type single
+    --num-workers 2   # Some issues with this, lower values are safer
+)
+
+MODEL_ARGS=(
+    --num-layers $NUM_LAYERS
+    --hidden-size $HIDDEN_SIZE
+    --ffn-hidden-size $FFN_HIDDEN_SIZE
+    --num-attention-heads $NUM_ATTENTION_HEADS
+)
+
+if [ "$NUM_QUERY_GROUPS" != "$NUM_ATTENTION_HEADS" ]; then
+    MODEL_ARGS+=(
+        --group-query-attention
+        --num-query-groups $NUM_QUERY_GROUPS
+    )
+fi
+
+if [ "$TIE_WORD_EMBEDDINGS" = "0" ]; then
+    MODEL_ARGS+=(
+	--untie-embeddings-and-output-weights
+    )
+fi
+
+if [ "$FSDP" = "1" ]; then
+    PARALLEL_ARGS=(
+	--use-torch-fsdp2
+    )
+else
+    PARALLEL_ARGS=(
+	--tensor-model-parallel-size $TENSOR_MODEL_PARALLEL_SIZE
+	--pipeline-model-parallel-size $PIPELINE_MODEL_PARALLEL_SIZE
+	--context-parallel-size $CONTEXT_PARALLEL_SIZE
+	--sequence-parallel
+	--use-distributed-optimizer
+    )
+fi
+
+if [ "$PROFILE" = "1" ]; then
+    PROFILE_ARGS=(
+	--use-pytorch-profiler
+	--profile-ranks 0
+	--profile-step-start 5
+	--profile-step-end 7
+    )
+else
+    PROFILE_ARGS=()
+fi
+
+MODEL_ARGS+=(
+    --use-flash-attn
+    --attention-softmax-in-fp32
+    --max-position-embeddings $SEQ_LENGTH
+    --seq-length $SEQ_LENGTH
+    --position-embedding-type rope
+    --rotary-base $ROTARY_BASE
+    --disable-bias-linear
+    --init-method-std $INIT_METHOD_STD
+    --attention-dropout 0.0
+    --hidden-dropout 0.0
+    --normalization RMSNorm
+    --micro-batch-size $MICRO_BATCH_SIZE
+    --global-batch-size $GLOBAL_BATCH_SIZE
+    --train-samples $TRAIN_SAMPLES
+    --bf16
+    --swiglu
+    --no-async-tensor-model-parallel-allreduce
+    --no-masked-softmax-fusion
+    --no-gradient-accumulation-fusion
+    --no-bias-dropout-fusion
+    --no-rope-fusion    # buggy on AMD, do not enable without validating
+    --distributed-timeout-minutes 30
+    --overlap-grad-reduce
+)
+
+OPTIMIZER_ARGS=(
+    --optimizer adam
+    --adam-beta1 $ADAM_BETA1
+    --adam-beta2 $ADAM_BETA2
+    --adam-eps $ADAM_EPS
+    --lr $LR
+    --min-lr $MIN_LR
+    --lr-decay-style cosine
+    --lr-decay-samples $LR_DECAY_SAMPLES
+    --lr-warmup-samples $LR_WARMUP_SAMPLES
+    --clip-grad $CLIP_GRAD
+    --weight-decay $WEIGHT_DECAY
+)
+
+OUTPUT_ARGS=(
+    --eval-interval $EVAL_INTERVAL
+    --eval-iters $EVAL_ITERS
+    --tensorboard-dir "$TENSORBOARD_DIR"
+    --tensorboard-queue-size 5
+    --log-throughput
+    --log-progress
+    --log-interval $LOG_INTERVAL
+)
+
+# Interleaved pipeline scheduling is only possible with pipeline
+# parallel degree > 1.
+if [ $PIPELINE_MODEL_PARALLEL_SIZE -gt 1 ] && [ $NUM_LAYERS_PER_VIRTUAL_PIPELINE_STAGE -gt 1 ]; then
+    PARALLEL_ARGS+=(
+	--num-layers-per-virtual-pipeline-stage $NUM_LAYERS_PER_VIRTUAL_PIPELINE_STAGE
+    )
+fi
+
+if [ "$RECOMPUTATION" = "1" ]; then
+    MODEL_ARGS+=(
+	--recompute-activations
+	--recompute-granularity selective
+    )
+fi
+
+CHECKPOINT_ARGS=(
+    --ckpt-format torch    # "legacy" checkpoints; torch_dist is crashing
+#     --async-save    # requires --ckpt-format torch_dist
+    --load "$CHECKPOINT_PATH"
+    --save "$CHECKPOINT_PATH"
+    --save-interval $SAVE_INTERVAL
+)
+
+COMMAND=" \
+    Megatron-LM/pretrain_gpt.py \
+    "${MODEL_ARGS[@]}" \
+    "${OPTIMIZER_ARGS[@]}" \
+    "${PARALLEL_ARGS[@]}" \
+    "${OUTPUT_ARGS[@]}" \
+    "${CHECKPOINT_ARGS[@]}" \
+    "${DATA_ARGS[@]}" \
+    "${PROFILE_ARGS[@]}" \
+"
+
+######################################################################
+#
+# Run the command through the launch script with srun.
+# Note that any node-specific setup needs to go into the launch script.
+#
+######################################################################
+
+echo '============= COMMAND: ============='
+echo "$COMMAND"
+echo '===================================='
+
+echo "START $SLURM_JOBID: $(date)"
+echo "SLURM_NNODES: $SLURM_NNODES"
+echo "SLURM_CPUS_PER_TASK: $SLURM_CPUS_PER_TASK"
+
+
+srun \
+    --label \
+    apptainer exec \
+    --nv \
+    -B "$BASE_DIR" \
+    -B "$BIND_DIRS" \
+    "$CONTAINER" \
+    "$LAUNCH_SCRIPT" \
+    $COMMAND
+echo "END $SLURM_JOBID: $(date)"
