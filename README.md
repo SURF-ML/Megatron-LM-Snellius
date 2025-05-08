@@ -78,9 +78,9 @@ Now you are inside the root directory of the Megatron-LM container. From here yo
 from datasets import load_dataset
 import os
 
-cache_dir = "$PROJECT_SPACE.hf_cache_dir"
+cache_dir = "$PROJECT_SPACE/.hf_cache_dir"
 os.makedirs(cache_dir, exist_ok=True)
-output_path = "$PROJECT_SPACEdatasets/fineweb-10BT.jsonl"
+output_path = "$PROJECT_SPACE/datasets/fineweb-10BT.jsonl"
 shard = "sample-10BT"
 
 d = load_dataset("HuggingFaceFW/fineweb", shard, cache_dir=cache_dir, split="train")
@@ -98,9 +98,9 @@ The data is still in text format while Megatron expects pretokenized data. Thus,
 Assuming a CPU or GPU node is allocated via salloc:
 ```bash
 cd <to_parent_directory_of_your_Megatron_LM_clone>
-CONTAINER=$PROJECT_SPACEcontainers/megatron-torch-2.7-nvcr.25-04.sif
-FINEWEB_INPUT=$PROJECT_SPACEdatasets/FineWeb/fineweb-10BT.jsonl
-FINEWEB_OUTPUT=$PROJECT_SPACEdatasets/FineWeb/fineweb-10BT
+CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-04.sif
+FINEWEB_INPUT=$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT.jsonl
+FINEWEB_OUTPUT=$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT
 WORKERS=${SLURM_CPUS_PER_NODE:-16}
 BIND_PATH=$PROJECT_SPACE
 
