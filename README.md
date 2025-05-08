@@ -75,17 +75,19 @@ apptainer shell -B $BIND_PATH $CONTAINER
 Now you are inside the root directory of the Megatron-LM container. From here you can use the pre-installed packages within the container without needing to build any virtual environments. 
 
 ```python
-from datasets import load_dataset
 import os
+from datasets import load_dataset
 
-cache_dir = "$PROJECT_SPACE/.hf_cache_dir"
+project_space = os.environ.get("PROJECT_SPACE", os.getcwd())
+cache_dir = os.path.join(project_space, "my_hf_cache_dir")
+output_path = os.path.join(project_space, "datasets", "FineWeb", "fineweb-10BT.jsonl")
+
 os.makedirs(cache_dir, exist_ok=True)
-output_path = "$PROJECT_SPACE/datasets/fineweb-10BT.jsonl"
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
 shard = "sample-10BT"
-
-d = load_dataset("HuggingFaceFW/fineweb", shard, cache_dir=cache_dir, split="train")
-
-d.to_json()
+dataset = load_dataset("HuggingFaceFW/fineweb", shard, cache_dir=cache_dir, split="train")
+dataset.to_json(output_path)
 ```
 
 ### Tokenization/Preprocessing
