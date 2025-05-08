@@ -40,7 +40,7 @@ export PROJECT_SPACE=/projects/0/prjsXXXX
 
 Or add it your .bashrc to have the project space persistent so you can always change directory easy with `cd $PROJECT_SPACE`
 ```
-echo 'export PROJECT_SPACE_ID=prjsXXXX' >> ~/.bashrc
+echo 'export PROJECT_SPACE=/projects/0/prjsXXXX' >> ~/.bashrc
 source ~/.bashrc
 ```
 
