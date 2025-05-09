@@ -103,7 +103,7 @@ cd <to_parent_directory_of_your_Megatron_LM_clone>
 CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-04.sif
 FINEWEB_INPUT=$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT.jsonl
 FINEWEB_OUTPUT=$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT
-WORKERS=${SLURM_CPUS_PER_NODE:-16}
+WORKERS=${SLURM_CPUS_PER_TASK:-16}
 BIND_PATH=$PROJECT_SPACE
 
 apptainer exec -B $BIND_PATH $CONTAINER bash -c "python Megatron-LM/tools/preprocess_data.py --input $FINEWEB_INPUT--output FINEWEB_OUTPUT --tokenizer-type HuggingFaceTokenizer --tokenizer-model gpt2 --append-eod --log-interval 10000 --workers $WORKERS"
