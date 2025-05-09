@@ -106,7 +106,7 @@ FINEWEB_OUTPUT=$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT
 WORKERS=${SLURM_CPUS_PER_TASK:-16}
 BIND_PATH=$PROJECT_SPACE
 
-apptainer exec -B $BIND_PATH $CONTAINER bash -c "python Megatron-LM/tools/preprocess_data.py --input $FINEWEB_INPUT--output FINEWEB_OUTPUT --tokenizer-type HuggingFaceTokenizer --tokenizer-model gpt2 --append-eod --log-interval 10000 --workers $WORKERS"
+apptainer exec -B $BIND_PATH $CONTAINER bash -c "python Megatron-LM/tools/preprocess_data.py --input $FINEWEB_INPUT--output $FINEWEB_OUTPUT --tokenizer-type HuggingFaceTokenizer --tokenizer-model gpt2 --append-eod --log-interval 10000 --workers $WORKERS"
 ```
 
 The output is an index file (idx) and the binary (bin) of the tokenizer model
