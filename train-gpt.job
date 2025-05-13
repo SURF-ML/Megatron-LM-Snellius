@@ -399,9 +399,11 @@ srun \
     --label \
     apptainer exec \
     --nv \
+    --no-home \
     -B "$BASE_DIR" \
     -B "$BIND_DIRS" \
     "$CONTAINER" \
     "$LAUNCH_SCRIPT" \
     $COMMAND
+
 echo "END $SLURM_JOBID: $(date)"
