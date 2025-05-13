@@ -40,7 +40,7 @@ export PROJECT_SPACE=/projects/0/prjsXXXX
 
 Or add it your .bashrc to have the project space persistent so you can always change directory easy with `cd $PROJECT_SPACE`
 ```
-echo 'export PROJECT_SPACE_ID=prjsXXXX' >> ~/.bashrc
+echo 'export PROJECT_SPACE=/projects/0/prjsXXXX' >> ~/.bashrc
 source ~/.bashrc
 ```
 
@@ -75,17 +75,19 @@ apptainer shell -B $BIND_PATH $CONTAINER
 Now you are inside the root directory of the Megatron-LM container. From here you can use the pre-installed packages within the container without needing to build any virtual environments. 
 
 ```python
-from datasets import load_dataset
 import os
+from datasets import load_dataset
 
-cache_dir = "$PROJECT_SPACE.hf_cache_dir"
+project_space = os.environ.get("PROJECT_SPACE", os.getcwd())
+cache_dir = os.path.join(project_space, "my_hf_cache_dir")
+output_path = os.path.join(project_space, "datasets", "FineWeb", "fineweb-10BT.jsonl")
+
 os.makedirs(cache_dir, exist_ok=True)
-output_path = "$PROJECT_SPACEdatasets/fineweb-10BT.jsonl"
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
 shard = "sample-10BT"
-
-d = load_dataset("HuggingFaceFW/fineweb", shard, cache_dir=cache_dir, split="train")
-
-d.to_json()
+dataset = load_dataset("HuggingFaceFW/fineweb", shard, cache_dir=cache_dir, split="train")
+dataset.to_json(output_path)
 ```
 
 ### Tokenization/Preprocessing
@@ -98,13 +100,13 @@ The data is still in text format while Megatron expects pretokenized data. Thus,
 Assuming a CPU or GPU node is allocated via salloc:
 ```bash
 cd <to_parent_directory_of_your_Megatron_LM_clone>
-CONTAINER=$PROJECT_SPACEcontainers/megatron-torch-2.7-nvcr.25-04.sif
-FINEWEB_INPUT=$PROJECT_SPACEdatasets/FineWeb/fineweb-10BT.jsonl
-FINEWEB_OUTPUT=$PROJECT_SPACEdatasets/FineWeb/fineweb-10BT
-WORKERS=${SLURM_CPUS_PER_NODE:-16}
+CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-04.sif
+FINEWEB_INPUT=$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT.jsonl
+FINEWEB_OUTPUT=$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT
+WORKERS=${SLURM_CPUS_PER_TASK:-16}
 BIND_PATH=$PROJECT_SPACE
 
-apptainer exec -B $BIND_PATH $CONTAINER bash -c "python Megatron-LM/tools/preprocess_data.py --input $FINEWEB_INPUT--output FINEWEB_OUTPUT --tokenizer-type HuggingFaceTokenizer --tokenizer-model gpt2 --append-eod --log-interval 10000 --workers $WORKERS$"
+apptainer exec -B $BIND_PATH $CONTAINER bash -c "python Megatron-LM/tools/preprocess_data.py --input $FINEWEB_INPUT--output $FINEWEB_OUTPUT --tokenizer-type HuggingFaceTokenizer --tokenizer-model gpt2 --append-eod --log-interval 10000 --workers $WORKERS"
 ```
 
 The output is an index file (idx) and the binary (bin) of the tokenizer model
