@@ -1,0 +1,13 @@
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --partition=rome
+#SBATCH --ntasks-per-node=1
+#SBATCH --time=8:00:00
+#SBATCH --exclusive
+
+cd /scratch-nvme/1/robertsc/network-test/Megatron-LM-Snellius
+
+
+source ~/projects/megatron_venv/bin/activate
+
+python download_data_shards.py --shard 350BT

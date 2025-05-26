@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --partition=rome
+#SBATCH --partition=cbuild
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=1:00:00
 #SBATCH --exclusive
@@ -9,16 +9,16 @@
 CONTAINER_URL=nvcr.io/nvidia/pytorch:25.04-py3
 CONTAINER_NAME=megatron-torch-2.7-nvcr.25-04.sif
 
-PROJECT_SPACE=
+PROJECT_SPACE=/scratch-nvme/1/robertsc/network-test/Megatron-LM-Snellius/
 
 if [ -z "$PROJECT_SPACE" ]; then
   echo "Error: PROJECT_SPACE is not set. Please set the project space path in this script. Example: export PROJECT_SPACE=/projects/0/prjsXXXX"
   exit 1
 fi
-CONTAINER_OUTPUT_PATH=$PROJECT_SPACE/containers/$CONTAINER_NAME
+CONTAINER_OUTPUT_PATH=$PROJECT_SPACE/container/$CONTAINER_NAME
 
 export APPTAINER_TMPDIR=/dev/shm/$USER
-export APPTAINER_CACHEDIR=/scratch-shared/$USER/apptainer
+export APPTAINER_CACHEDIR=$PROJECT_SPACE/apptainer
 
 mkdir -p $APPTAINER_TMPDIR $APPTAINER_CACHEDIR $CONTAINER_OUTPUT_PATH
 
@@ -33,9 +33,11 @@ From: $CONTAINER_URL
      mkdir /usr/local/cuda/compat/lib/
      ln -s /usr/local/cuda/compat/lib.real /usr/local/cuda/compat/lib
      export PIP_NO_CACHE_DIR=1
-     pip install nltk wandb
-     pip install transformers -v --no-deps
-     pip install datasets tokenizers sentencepiece protobuf tqdm regex pyyaml huggingface_hub --no-deps
+
+     pip install nltk wandb transformers tokenizers sentencepiece protobuf tqdm regex pyyaml huggingface_hub
+
+     pip install -U --no-build-isolation datasets
+     pip install -U --no-build-isolation --no-deps datasets
 
 %environment
     export LD_PRELOAD=
@@ -43,7 +45,7 @@ From: $CONTAINER_URL
 EOF
 
 echo "Downloading $CONTAINER_URL to $CONTAINER_OUTPUT_PATH"
-apptainer build $CONTAINER_OUTPUT_PATH $TMP_CONTAINER_FILENAME
+apptainer build --force $CONTAINER_OUTPUT_PATH $TMP_CONTAINER_FILENAME
 
 rm $TMP_CONTAINER_FILENAME
-echo "Done building! Check out $CONTAINER_OUTPUT_PATH
+echo "Done building! Check out $CONTAINER_OUTPUT_PATH"

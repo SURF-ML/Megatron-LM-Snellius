@@ -3,7 +3,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --ntasks-per-node=4
 #SBATCH --nodes=4
-#SBATCH --partition=gpu_h100
+#SBATCH --partition=gpu_sw_h100
 #SBATCH --time=1:00:00
 #SBATCH --exclusive
 #SBATCH --gpus-per-node=4
@@ -45,14 +45,15 @@ if [ -z $SLURM_JOB_ID ]; then
     exit
 fi
 
-export PROJECT_SPACE=
+export PROJECT_SPACE=/scratch-nvme/1/robertsc/network-test/Megatron-LM-Snellius
 
 if [ -z "$PROJECT_SPACE" ]; then
   echo "Error: PROJECT_SPACE is not set. Please set the project space path in this script. Example: export PROJECT_SPACE=/projects/0/prjsXXXX"
   exit 1
 fi
 
-CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-04.sif
+# CONTAINER=$PROJECT_SPACE/container/megatron-torch-2.7-nvcr.25-04.sif
+CONTAINER=$PROJECT_SPACE/container/pytorch_24.02-py3.sif
 
 # Bash "strict mode"
 # (see http://redsymbol.net/articles/unofficial-bash-strict-mode/)
@@ -153,7 +154,9 @@ export NVTE_DEBUG_LEVEL=0
 ######################################################################
 
 # DATA
-DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT_text_document"
+# DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT_text_document"
+DATA_PATH="/projects/0/hpmlprjs/LLM/megatron-lm_benchmark/dataset/FineWeb/fineweb-10BT_text_document"
+
 DATA_CACHE_PATH="/scratch-shared/$USER/megatron_cache"
 TOKENIZER_MODEL="gpt2"
 

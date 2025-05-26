@@ -1,3 +1,16 @@
+# all the random shit we generate
+*.sif
+*.out
+datasets/
+venv/
+logs/
+apptainer/
+Megatron-LM/
+my_hf_cache_dir/
+
+# larsve badly named venv
+megatron/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
