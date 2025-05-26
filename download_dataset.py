@@ -12,5 +12,5 @@ os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
 # Load and save dataset
 shard = "sample-10BT"
-dataset = load_dataset("HuggingFaceFW/fineweb", shard, cache_dir=cache_dir, split="train")
+dataset = load_dataset("HuggingFaceFW/fineweb", shard, cache_dir=cache_dir, split="train", num_proc=len(os.sched_getaffinity(0)))
 dataset.to_json(output_path)    

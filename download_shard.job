@@ -2,12 +2,18 @@
 #SBATCH --nodes=1
 #SBATCH --partition=rome
 #SBATCH --ntasks-per-node=1
-#SBATCH --time=8:00:00
-#SBATCH --exclusive
+#SBATCH --time=14:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
 
 cd /scratch-nvme/1/robertsc/network-test/Megatron-LM-Snellius
 
 
 source ~/projects/megatron_venv/bin/activate
 
-python download_data_shards.py --shard 350BT
+export HF_DATASETS_CACHE="/scratch-shared/larsve/hf_cache_dir"
+export HF_HUB_CACHE="/scratch-shared/larsve/hf_cache_dir"
+
+# First download multiprocessed, then processes single process to prevent multiprocessing error.
+python download_data_shards.py --shard 350BT --download_only
+python download_data_shards.py --shard 350BT --num_proc 1
