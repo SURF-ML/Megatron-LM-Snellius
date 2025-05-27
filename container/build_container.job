@@ -33,9 +33,9 @@ From: $CONTAINER_URL
      mkdir /usr/local/cuda/compat/lib/
      ln -s /usr/local/cuda/compat/lib.real /usr/local/cuda/compat/lib
      export PIP_NO_CACHE_DIR=1
-     pip install nltk wandb
+     pip install nltk wandb datasets
      pip install transformers -v --no-deps
-     pip install datasets tokenizers sentencepiece protobuf tqdm regex pyyaml huggingface_hub --no-deps
+     pip install tokenizers sentencepiece protobuf tqdm regex pyyaml huggingface_hub --no-deps
 
 %environment
     export LD_PRELOAD=
