@@ -2,8 +2,8 @@
 #SBATCH --job-name=train-gpt
 #SBATCH --cpus-per-task=16
 #SBATCH --ntasks-per-node=4
-#SBATCH --nodes=4
-#SBATCH --partition=gpu_sw_h100
+#SBATCH --nodes=2
+#SBATCH --partition=gpu_h100
 #SBATCH --time=1:00:00
 #SBATCH --exclusive
 #SBATCH --gpus-per-node=4
@@ -52,8 +52,7 @@ if [ -z "$PROJECT_SPACE" ]; then
   exit 1
 fi
 
-# CONTAINER=$PROJECT_SPACE/container/megatron-torch-2.7-nvcr.25-04.sif
-CONTAINER=$PROJECT_SPACE/container/pytorch_24.02-py3.sif
+CONTAINER=$PROJECT_SPACE/container/megatron-torch-2.7-nvcr.25-05.sif
 
 # Bash "strict mode"
 # (see http://redsymbol.net/articles/unofficial-bash-strict-mode/)
@@ -76,7 +75,7 @@ if [[ -v SLURM_RESTART_COUNT ]]; then
         echo "RUN RESTARTED but no node failure logged"
     else
         failed_node="${failed_node//$'\n'/ }"
-        echo "RUN RESTARTED AFTER FAILURE OF NODE(s) $failed_node. Reason:"
+        echo "RUN RESTARTED AFTER FAILURE OF NODE(s) $failed_nod.. Reason:"
         sacctmgr show event where node="$failed_node" format="NodeName,TimeStart,TimeEnd,State,Reason%100"
     fi
 fi
@@ -87,14 +86,47 @@ fi
 #ln -sf "${logfile_basename}.err" "logs/latest.err"
 
 # Modules are needed with the container we are using.
-module purge
-module load 2024 NCCL/2.22.3-GCCcore-13.3.0-CUDA-12.6.0
+# module purge
+# module load 2024 NCCL/2.22.3-GCCcore-13.3.0-CUDA-12.6.0
 
 # Directories to map into container
-BIND_DIRS="/scratch-shared/$USER,$PROJECT_SPACE"
+BIND_DIRS=$TMPDIR,"/scratch-shared/$USER,$PROJECT_SPACE"
+BIND_SLURM="""\
+/etc/passwd,\
+/etc/slurm/,\
+/opt/ear/,\
+/usr/bin/scontrol,\
+/usr/bin/srun,\
+/usr/lib64/libcrypt.so.2,\
+/usr/lib64/libdbus-1.so.3,\
+/usr/lib64/libfreeipmi.so.17,\
+/usr/lib64/libibmad.so.5,\
+/usr/lib64/libipmimonitoring.so.6,\
+/usr/lib64/libjson-c.so.5,\
+/usr/lib64/libjwt.so.1,\
+/usr/lib64/libjwt.so.1.7.0,\
+/usr/lib64/liblua-5.4.so,\
+/usr/lib64/liblua.so,\
+/usr/lib64/libmariadb.so.3,\
+/usr/lib64/libmunge.so.2,\
+/usr/lib64/libyaml-0.so.2,\
+/usr/lib64/lua,\
+/usr/lib64/slurm/,\
+/usr/share/lua,\
+/var/run/,\
+/var/spool/slurm/\
+"""
+
 
 # Avoid conflicts with $HOME/.local
 export PYTHONUSERBASE=""
+# Ensure Triton cache is writable
+export TRITON_CACHE_DIR=/scratch-shared/$USER/triton_cache_$SLURM_PROCID
+mkdir -p "$TRITON_CACHE_DIR"
+export TORCHINDUCTOR_CACHE_DIR=/scratch-shared/$USER/inductor_cache_${SLURM_NODEID}_${SLURM_PROCID}
+export XDG_CACHE_HOME=/scratch-shared/$USER/triton_cache_$SLURM_PROCID
+
+# export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
 
 # Compilers in the container
 export CC=gcc
@@ -102,7 +134,8 @@ export CXX=g++
 
 # PATHS
 BASE_DIR="$PWD" #$SLURM_SUBMIT_DIR"
-OUTPUT_DIR="/scratch-shared/$USER/Megatron-LM/output"
+
+OUTPUT_DIR="$PROJECT_SPACE/output"
 CHECKPOINT_PATH="$OUTPUT_DIR/checkpoints"
 TENSORBOARD_DIR="$OUTPUT_DIR/tensorboard/$SLURM_JOB_NAME-$SLURM_JOBID"
 
@@ -115,12 +148,7 @@ LAUNCH_SCRIPT="$BASE_DIR/launch.sh"
 # (see https://github.com/NVIDIA/Megatron-LM/issues/533)
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 
-export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
-export MASTER_PORT=9999
-export WORLD_SIZE=$SLURM_NTASKS    # Note: only valid if ntasks==ngpus
-
 # OMP THREADING
-export OMP_NUM_THREADS=${SLURM_CPUS_PER_NODE:-2}
 
 # This setting is reported to provide a performance improvement
 # (https://arxiv.org/pdf/2408.14090v1) but as of April 2025 is causing
@@ -133,7 +161,7 @@ export OMP_NUM_THREADS=${SLURM_CPUS_PER_NODE:-2}
 # export MIOPEN_ENABLE_LOGGING=1
 export PYTHONWARNINGS=ignore
 # export TORCH_SHOW_CPP_STACKTRACES=1
-# export NCCL_DEBUG=INFO
+export NCCL_DEBUG=INFO
 # export RCCL_KERNEL_COLL_TRACE_ENABLE=1
 # export NCCL_DEBUG_SUBSYS=ALL
 # export NCCL_DEBUG_FILE=$OUTPUT_DIR/nccl-debug-${SLURM_JOB_NAME}-${SLURM_JOBID}.log #Move verbose nccl logging to its own file
@@ -155,9 +183,9 @@ export NVTE_DEBUG_LEVEL=0
 
 # DATA
 # DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT_text_document"
-DATA_PATH="/projects/0/hpmlprjs/LLM/megatron-lm_benchmark/dataset/FineWeb/fineweb-10BT_text_document"
+DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/10BT/fineweb-10BT_text_document"
 
-DATA_CACHE_PATH="/scratch-shared/$USER/megatron_cache"
+DATA_CACHE_PATH="/dev/shm/megatron_cache"
 TOKENIZER_MODEL="gpt2"
 
 # MODEL
@@ -189,10 +217,13 @@ LR_WARMUP_ITERS=500
 CLIP_GRAD=1.0
 WEIGHT_DECAY=1e-1
 
+
+
 # TRAINING
 FSDP=0
-GLOBAL_BATCH_SIZE=64
-MICRO_BATCH_SIZE=4
+
+MICRO_BATCH_SIZE=16
+GLOBAL_BATCH_SIZE=$(($MICRO_BATCH_SIZE * $SLURM_NNODES * 4))
 RECOMPUTATION=0
 TRAIN_TOKENS=350_000_000_000    # TRAIN_SAMPLES computed from this
 
@@ -250,7 +281,7 @@ DATA_ARGS=(
     --tokenizer-model "$TOKENIZER_MODEL"
     --make-vocab-size-divisible-by 128
     --dataloader-type single
-    --num-workers 2   # Some issues with this, lower values are safer
+    --num-workers 4   # Some issues with this, lower values are safer
 )
 
 MODEL_ARGS=(
@@ -313,10 +344,15 @@ MODEL_ARGS+=(
     --micro-batch-size $MICRO_BATCH_SIZE
     --global-batch-size $GLOBAL_BATCH_SIZE
     --train-samples $TRAIN_SAMPLES
+    # --train-samples 100
+    # --train-iters 10
+    --eval-iters 0
+    --eval-interval 1
+
     --bf16
     --swiglu
-    --no-async-tensor-model-parallel-allreduce
-    --no-masked-softmax-fusion
+    # --no-async-tensor-model-parallel-allreduce
+    # --no-masked-softmax-fusion
     --no-gradient-accumulation-fusion
     --no-bias-dropout-fusion
     --no-rope-fusion    # buggy on AMD, do not enable without validating
@@ -339,10 +375,10 @@ OPTIMIZER_ARGS=(
 )
 
 OUTPUT_ARGS=(
-    --eval-interval $EVAL_INTERVAL
-    --eval-iters $EVAL_ITERS
-    --tensorboard-dir "$TENSORBOARD_DIR"
-    --tensorboard-queue-size 5
+    # --eval-interval $EVAL_INTERVAL
+    # --eval-iters $EVAL_ITERS
+    # --tensorboard-dir "$TENSORBOARD_DIR"
+    # --tensorboard-queue-size 5
     --log-throughput
     --log-progress
     --log-interval $LOG_INTERVAL
@@ -395,18 +431,41 @@ echo '===================================='
 
 echo "START $SLURM_JOBID: $(date)"
 echo "SLURM_NNODES: $SLURM_NNODES"
-echo "SLURM_CPUS_PER_TASK: $SLURM_CPUS_PER_TASK"
+# echo "SLURM_CPUS_PER_TASK: $SLURM_CPUS_PER_TASK"
 
+
+
+# Disable IB
+# NCCL_IB_HCA="mlx5_0"
+
+# One IB
+# NCCL_IB_HCA="mlx5_2"
+
+# Two IB
+# NCCL_IB_HCA="mlx5_2,mlx5_3"
+
+# Three IB
+# NCCL_IB_HCA="mlx5_2,mlx5_3,mlx5_4"
+
+# Four IB
+NCCL_IB_HCA="mlx5_2,mlx5_3,mlx5_4,mlx5_5"
 
 srun \
     --label \
+    --gpus-per-node=4 \
     apptainer exec \
     --nv \
     --no-home \
+    --env TRITON_LIBCUDA_PATH=/usr/local/cuda-12.9/compat/lib.real/lib/libcuda.so.1 \
+    --env HF_HOME=$PROJECT_SPACE/cache/$USER \
+    --env NCCL_SOCKET_IFNAME=eno2np0 \
+    --env NCCL_IB_HCA=$NCCL_IB_HCA \
+    --env TMPDIR=$TMPDIR \
     -B "$BASE_DIR" \
     -B "$BIND_DIRS" \
+    -B "$BIND_SLURM" \
     "$CONTAINER" \
     "$LAUNCH_SCRIPT" \
     $COMMAND
 
-echo "END $SLURM_JOBID: $(date)"
+# echo "END $SLURM_JOBID: $(date)"

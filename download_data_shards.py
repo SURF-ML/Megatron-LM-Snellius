@@ -13,7 +13,7 @@ def download_data(shard, num_proc, download_only=False):
     print(cache_dir)
     if num_proc is None:
         num_proc=len(os.sched_getaffinity(0))
-    dataset = load_dataset("HuggingFaceFW/fineweb", f"sample-{shard}", cache_dir=cache_dir, split="train", num_proc=len(os.sched_getaffinity(0)))
+    dataset = load_dataset("HuggingFaceFW/fineweb", f"sample-{shard}", cache_dir=cache_dir, split="train", num_proc=num_proc)
     if not download_only:
         dataset.to_json(output_path)
 
@@ -24,6 +24,4 @@ if __name__ == "__main__":
     parser.add_argument("--num_proc", type=int, default=None)
     parser.add_argument("--download_only", action="store_true", default=False)
     args = parser.parse_args()
-    download_data(args.shard)
-
-
+    download_data(args.shard, args.num_proc, args.download_only)

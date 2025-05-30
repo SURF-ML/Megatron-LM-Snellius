@@ -1,0 +1,37 @@
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --partition=rome
+#SBATCH --ntasks-per-node=1
+#SBATCH --time=30:00:00
+#SBATCH --ntasks=1
+#SBATCH --exclusive
+
+source ~/projects/megatron_venv/bin/activate
+
+module load 2024
+
+module load Python/3.12.3-GCCcore-13.3.0
+
+cd /scratch-nvme/1/robertsc/network-test/Megatron-LM-Snellius
+
+
+
+
+SHARD=350BT
+# Set WORKERS adaptively based on SLURM allocation or system CPU count
+if [ -n "$SLURM_CPUS_PER_TASK" ]; then
+    WORKERS=$SLURM_CPUS_PER_TASK
+else
+    WORKERS=$(nproc)
+fi
+
+BASE_DIR=/scratch-shared/larsve/Megatron-LM-Snellius
+# FINEWEB_INPUT=$PROJECT_SPACE/datasets/FineWeb/fineweb-$SHARD.jsonl 
+# FINEWEB_OUTPUT=$PROJECT_SPACE/datasets/FineWeb/fineweb-$SHARD  
+FINEWEB_INPUT=$BASE_DIR/datasets/FineWeb/fineweb-$SHARD.jsonl
+FINEWEB_OUTPUT=$BASE_DIR/datasets/FineWeb/fineweb-$SHARD  
+
+
+CMD="python Megatron-LM/tools/preprocess_data.py --input $FINEWEB_INPUT --output-prefix $FINEWEB_OUTPUT --tokenizer-type HuggingFaceTokenizer --tokenizer-model gpt2 --append-eod --log-interval 10000 --workers $WORKERS --output-prefix=fineweb-$SHARD"
+echo $CMD
+srun $CMD

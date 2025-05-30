@@ -6,8 +6,8 @@
 #SBATCH --exclusive
 
 
-CONTAINER_URL=nvcr.io/nvidia/pytorch:25.04-py3
-CONTAINER_NAME=megatron-torch-2.7-nvcr.25-04.sif
+CONTAINER_URL=nvcr.io/nvidia/pytorch:25.05-py3
+CONTAINER_NAME=megatron-torch-2.7-nvcr.25-05.sif
 
 PROJECT_SPACE=/scratch-nvme/1/robertsc/network-test/Megatron-LM-Snellius/
 
@@ -18,10 +18,9 @@ if [ -z "$PROJECT_SPACE" ]; then
   exit 1
 fi
 CONTAINER_OUTPUT_PATH=$PROJECT_SPACE/container/$CONTAINER_NAME
-#CONTAINER_OUTPUT_PATH=/dev/shm/$CONTAINER_NAME
 
 export APPTAINER_TMPDIR=/dev/shm/$USER
-export APPTAINER_CACHEDIR=$PROJECT_SPACE/apptainer
+export APPTAINER_CACHEDIR=/scratch-shared/$USER/apptainer
 
 mkdir -p $APPTAINER_TMPDIR $APPTAINER_CACHEDIR $CONTAINER_OUTPUT_PATH
 
@@ -33,10 +32,8 @@ Bootstrap: docker
 From: $CONTAINER_URL
 
 %post
-     mkdir /usr/local/cuda/compat/lib/
-     ln -s /usr/local/cuda/compat/lib.real /usr/local/cuda/compat/lib
+     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-12.9/compat
      export PIP_NO_CACHE_DIR=1
-
      pip install nltk wandb transformers tokenizers sentencepiece protobuf tqdm regex pyyaml huggingface_hub
 
      pip install -U --no-build-isolation datasets
@@ -44,13 +41,12 @@ From: $CONTAINER_URL
 
 %environment
     export LD_PRELOAD=
-
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-12.9/compat
+    
 EOF
 
 echo "Downloading $CONTAINER_URL to $CONTAINER_OUTPUT_PATH"
 apptainer build --force $CONTAINER_OUTPUT_PATH $TMP_CONTAINER_FILENAME
-
-# cp $CONTAINER_OUTPUT_PATH $PROJECT_SPACE/container/
 
 rm $TMP_CONTAINER_FILENAME
 echo "Done building! Check out $CONTAINER_OUTPUT_PATH"
