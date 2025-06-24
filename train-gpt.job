@@ -56,7 +56,7 @@ CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-04.sif
 
 # Bash "strict mode"
 # (see http://redsymbol.net/articles/unofficial-bash-strict-mode/)
-set -euo pipefail
+#set -euo pipefail
 
 # When slurm reschedules a job that ended on node failure, it will run
 # with the same job ID, clobbering the original logs. Rename the logs
@@ -116,7 +116,7 @@ export CUDA_DEVICE_MAX_CONNECTIONS=1
 
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 export MASTER_PORT=9999
-export WORLD_SIZE=$SLURM_NTASKS    # Note: only valid if ntasks==ngpus
+export WORLD_SIZE=${SLURM_NTASKS:-$(( ${SLURM_GPUS_PER_NODE:-1} * ${SLURM_NNODES:-2} ))} # Note: only valid if ntasks==ngpus
 
 # OMP THREADING
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_NODE:-2}
@@ -153,9 +153,11 @@ export NVTE_DEBUG_LEVEL=0
 ######################################################################
 
 # DATA
-DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT_text_document"
+#DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT_text_document" # gpt-2
+DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT-llama3_text_document" # llama 3
+#TOKENIZER_MODEL="gpt2"
+TOKENIZER_MODEL="/projects/0/prjs1502/tokenizers/models--meta-llama--Meta-Llama-3.1-8B-Instruct/snapshots/8c22764a7e3675c50d4c7c9a4edb474456022b16" # llama3
 DATA_CACHE_PATH="/scratch-shared/$USER/megatron_cache"
-TOKENIZER_MODEL="gpt2"
 
 # MODEL
 # 1,713,735,680 (1.7B) parameters
@@ -166,7 +168,7 @@ NUM_ATTENTION_HEADS=32
 NUM_QUERY_GROUPS=32    # No GQA when NUM_QUERY_GROUPS=NUM_ATTENTION_HEADS
 TIE_WORD_EMBEDDINGS=1
 INIT_METHOD_STD=0.02
-SEQ_LENGTH=2048
+SEQ_LENGTH=4096
 ROTARY_BASE=10000    # Default, recommend larger for higher seq len
 
 # PARALLELISM
@@ -392,8 +394,6 @@ echo '===================================='
 
 echo "START $SLURM_JOBID: $(date)"
 echo "SLURM_NNODES: $SLURM_NNODES"
-echo "SLURM_CPUS_PER_TASK: $SLURM_CPUS_PER_TASK"
-
 
 srun \
     --label \
