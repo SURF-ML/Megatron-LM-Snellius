@@ -2,13 +2,14 @@
 #SBATCH --job-name=train-gpt
 #SBATCH --cpus-per-task=16
 #SBATCH --ntasks-per-node=4
-#SBATCH --nodes=4
+#SBATCH --nodes=1
 #SBATCH --partition=gpu_h100
-#SBATCH --time=1:00:00
+#SBATCH --time=24:00:00
 #SBATCH --exclusive
 #SBATCH --gpus-per-node=4
 #SBATCH --output logs/%j.out
 #SBATCH --error logs/%j.err
+#SBATCH --reservation gpt-nl
 
 # This is a slurm script for training generative models on LUMI using
 # Megatron-LM pretrain_gpt.py. This script defines defaults for
@@ -45,13 +46,16 @@ if [ -z $SLURM_JOB_ID ]; then
     exit
 fi
 
-export PROJECT_SPACE=
+export PROJECT_SPACE=/projects/0/prjs1502
+WANDB_API_KEY=
+export WANDB_API_KEY="${WANDB_API_KEY:-}"
 
 if [ -z "$PROJECT_SPACE" ]; then
   echo "Error: PROJECT_SPACE is not set. Please set the project space path in this script. Example: export PROJECT_SPACE=/projects/0/prjsXXXX"
   exit 1
 fi
 
+#CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-04.sif
 CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-04.sif
 
 # Bash "strict mode"
@@ -89,6 +93,7 @@ fi
 module purge
 module load 2024 NCCL/2.22.3-GCCcore-13.3.0-CUDA-12.6.0
 
+
 # Directories to map into container
 BIND_DIRS="/scratch-shared/$USER,$PROJECT_SPACE"
 
@@ -117,7 +122,6 @@ export CUDA_DEVICE_MAX_CONNECTIONS=1
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 export MASTER_PORT=9999
 export WORLD_SIZE=${SLURM_NTASKS:-$(( ${SLURM_GPUS_PER_NODE:-1} * ${SLURM_NNODES:-2} ))} # Note: only valid if ntasks==ngpus
-
 # OMP THREADING
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_NODE:-2}
 
@@ -159,6 +163,7 @@ DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT-llama3_text_document" # 
 TOKENIZER_MODEL="/projects/0/prjs1502/tokenizers/models--meta-llama--Meta-Llama-3.1-8B-Instruct/snapshots/8c22764a7e3675c50d4c7c9a4edb474456022b16" # llama3
 DATA_CACHE_PATH="/scratch-shared/$USER/megatron_cache"
 
+
 # MODEL
 # 1,713,735,680 (1.7B) parameters
 NUM_LAYERS=24
@@ -190,7 +195,7 @@ WEIGHT_DECAY=1e-1
 
 # TRAINING
 FSDP=0
-GLOBAL_BATCH_SIZE=64
+GLOBAL_BATCH_SIZE=32
 MICRO_BATCH_SIZE=4
 RECOMPUTATION=0
 TRAIN_TOKENS=350_000_000_000    # TRAIN_SAMPLES computed from this
@@ -248,6 +253,7 @@ DATA_ARGS=(
     --tokenizer-type HuggingFaceTokenizer
     --tokenizer-model "$TOKENIZER_MODEL"
     --make-vocab-size-divisible-by 128
+    --vocab-size 128256
     --dataloader-type single
     --num-workers 2   # Some issues with this, lower values are safer
 )
@@ -295,6 +301,18 @@ if [ "$PROFILE" = "1" ]; then
     )
 else
     PROFILE_ARGS=()
+fi
+
+if [ -n "$WANDB_API_KEY" ]; then
+    WANDB_ARGS=(
+        --wandb-project ${WANDB_PROJECT:-"Pretraining-Llama3"}
+        --wandb-exp-name ${WANDB_NAME:-"Llama-3-1B"}
+        --wandb-save-dir $OUTPUT_DIR
+    )
+    export WANDB_DATA_DIR=/scratch-shared/$USER/wandb
+    mkdir -p $WANDB_DATA_DIR
+else
+    WANDB_ARGS=()
 fi
 
 MODEL_ARGS+=(
@@ -379,6 +397,7 @@ COMMAND=" \
     "${CHECKPOINT_ARGS[@]}" \
     "${DATA_ARGS[@]}" \
     "${PROFILE_ARGS[@]}" \
+    "${WANDB_ARGS[@]}" \
 "
 
 ######################################################################
@@ -394,6 +413,11 @@ echo '===================================='
 
 echo "START $SLURM_JOBID: $(date)"
 echo "SLURM_NNODES: $SLURM_NNODES"
+
+
+export XDG_CACHE_HOME=/scratch-shared/$USER/
+export TRITON_CACHE_DIR=/scratch-shared/$USER
+
 
 srun \
     --label \
