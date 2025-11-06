@@ -46,4 +46,4 @@ echo "Downloading $CONTAINER_URL to $CONTAINER_OUTPUT_PATH"
 apptainer build $CONTAINER_OUTPUT_PATH $TMP_CONTAINER_FILENAME
 
 rm $TMP_CONTAINER_FILENAME
-echo "Done building! Check out $CONTAINER_OUTPUT_PATH
+echo "Done building! Check out $CONTAINER_OUTPUT_PATH"
