@@ -40,6 +40,7 @@ From: $CONTAINER_URL
      pip install transformers -v --no-deps
      pip install tokenizers sentencepiece protobuf tqdm regex pyyaml huggingface_hub --no-deps
      pip install numpy==1.26.4 
+     pip install huggingface_hub==0.36.0
 
 %environment
     export LD_PRELOAD=

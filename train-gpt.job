@@ -10,7 +10,7 @@
 #SBATCH --output logs/%j.out
 #SBATCH --error logs/%j.err
 
-# This is a slurm script for training generative models on LUMI using
+# This is a slurm script for training generative models on Snellius using
 # Megatron-LM pretrain_gpt.py. This script defines defaults for
 # training a FineWeb-like model (approx. 1.7B parameters) and is
 # intended to be reasonably easily modified for other model sizes
@@ -52,7 +52,7 @@ if [ -z "$PROJECT_SPACE" ]; then
   exit 1
 fi
 
-CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-04.sif
+CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-10.sif
 
 # Bash "strict mode"
 # (see http://redsymbol.net/articles/unofficial-bash-strict-mode/)

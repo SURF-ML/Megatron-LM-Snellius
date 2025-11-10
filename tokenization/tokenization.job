@@ -1,0 +1,24 @@
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --partition=rome
+#SBATCH --ntasks-per-node=1
+#SBATCH --time=1:00:00
+#SBATCH --exclusive
+
+
+PROJECT_SPACE=
+
+if [ -z "$PROJECT_SPACE" ]; then
+  echo "Error: PROJECT_SPACE is not set. Please set the project space path in this script. Example: export PROJECT_SPACE=/projects/0/prjsXXXX"
+  exit 1
+fi
+
+
+
+CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-10.sif
+FINEWEB_INPUT=$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT.jsonl
+FINEWEB_OUTPUT=$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT
+WORKERS=${SLURM_CPUS_PER_TASK:-16}
+BIND_PATH=$PROJECT_SPACE
+
+apptainer exec -B $BIND_PATH $CONTAINER bash -c "python ../Megatron-LM/tools/preprocess_data.py --input $FINEWEB_INPUT --output-prefix $FINEWEB_OUTPUT --tokenizer-type HuggingFaceTokenizer --tokenizer-model gpt2 --append-eod --log-interval 10000 --workers $WORKERS"

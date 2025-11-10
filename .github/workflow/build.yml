@@ -1,0 +1,29 @@
+name: build
+
+on:
+  schedule:
+    - cron: '0 0 1 * *' # once a month
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+jobs:
+
+  build:
+    name: Build for (${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: ['ubuntu-latest']
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: eWaterCycle/setup-apptainer@v2
+        with:
+          apptainer_version: '1.4.4'
+      - name: Run apptainer build
+        run: apptainer run docker://alpine cat /etc/os-release
