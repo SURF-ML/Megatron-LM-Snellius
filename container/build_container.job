@@ -6,8 +6,8 @@
 #SBATCH --exclusive
 
 
-CONTAINER_URL=nvcr.io/nvidia/pytorch:25.04-py3
-CONTAINER_NAME=megatron-torch-2.7-nvcr.25-04.sif
+CONTAINER_URL=nvcr.io/nvidia/pytorch:25.10-py3
+CONTAINER_NAME=megatron-torch-2.7-nvcr.25-10.sif
 
 PROJECT_SPACE=
 
@@ -39,6 +39,7 @@ From: $CONTAINER_URL
      pip install nltk wandb datasets
      pip install transformers -v --no-deps
      pip install tokenizers sentencepiece protobuf tqdm regex pyyaml huggingface_hub --no-deps
+     pip install numpy==1.26.4 
 
 %environment
     export LD_PRELOAD=

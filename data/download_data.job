@@ -13,9 +13,7 @@ if [ -z "$PROJECT_SPACE" ]; then
   exit 1
 fi
 
-CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-04.sif
+CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-10.sif
 BIND_PATH=$PROJECT_SPACE
 
-apptainer shell -B $BIND_PATH $CONTAINER
-
-python download_data.py
+apptainer exec --env "PROJECT_SPACE=$PROJECT_SPACE"  -B $BIND_PATH $CONTAINER python download_data.py
