@@ -153,10 +153,8 @@ export NVTE_DEBUG_LEVEL=0
 ######################################################################
 
 # DATA
-#DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT_text_document" # gpt-2
-DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT-llama3_text_document" # llama 3
-#TOKENIZER_MODEL="gpt2"
-TOKENIZER_MODEL="/projects/0/prjs1502/tokenizers/models--meta-llama--Meta-Llama-3.1-8B-Instruct/snapshots/8c22764a7e3675c50d4c7c9a4edb474456022b16" # llama3
+DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT_text_document"
+TOKENIZER_MODEL="gpt2"
 DATA_CACHE_PATH="/scratch-shared/$USER/megatron_cache"
 
 # MODEL

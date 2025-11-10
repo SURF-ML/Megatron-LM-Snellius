@@ -91,7 +91,7 @@ dataset.to_json(output_path)
 ```
 
 ### Tokenization/Preprocessing
-- Estimated time: 30 minutes
+- Estimated time: 1 hour
 
 
 The data is still in text format while Megatron expects pretokenized data. Thus, the preprocessing extracts given a tokenizer the token ids for the text in this step.
@@ -106,7 +106,7 @@ FINEWEB_OUTPUT=$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT
 WORKERS=${SLURM_CPUS_PER_TASK:-16}
 BIND_PATH=$PROJECT_SPACE
 
-apptainer exec -B $BIND_PATH $CONTAINER bash -c "python Megatron-LM/tools/preprocess_data.py --input $FINEWEB_INPUT--output $FINEWEB_OUTPUT --tokenizer-type HuggingFaceTokenizer --tokenizer-model gpt2 --append-eod --log-interval 10000 --workers $WORKERS"
+apptainer exec -B $BIND_PATH $CONTAINER bash -c "python Megatron-LM/tools/preprocess_data.py --input $FINEWEB_INPUT --output-prefix $FINEWEB_OUTPUT --tokenizer-type HuggingFaceTokenizer --tokenizer-model gpt2 --append-eod --log-interval 10000 --workers $WORKERS"
 ```
 
 The output is an index file (idx) and the binary (bin) of the tokenizer model
