@@ -152,8 +152,10 @@ export NVTE_DEBUG_LEVEL=0
 #
 ######################################################################
 
+export HF_HOME=/scratch-shared/$USER/huggingface
+
 # DATA
-DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT_text_document"
+DATA_PATH="$PROJECT_SPACE/datasets/FineWeb/fineweb-10BT"
 TOKENIZER_MODEL="gpt2"
 DATA_CACHE_PATH="/scratch-shared/$USER/megatron_cache"
 

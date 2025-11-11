@@ -33,8 +33,18 @@ Bootstrap: docker
 From: $CONTAINER_URL
 
 %post
-     mkdir /usr/local/cuda/compat/lib/
-     ln -s /usr/local/cuda/compat/lib.real /usr/local/cuda/compat/lib
+
+     # Create the directory Triton expects and point it to the host driver
+     # because Triton requires /usr/local/cuda/compat/lib/libcuda.so.1 to exist for GPU runtime
+     mkdir -p /usr/local/cuda/compat/lib/
+     ln -sf /usr/lib64/libcuda.so /usr/local/cuda/compat/lib/libcuda.so.1
+     ln -sf libcuda.so.1 /usr/local/cuda/compat/lib/libcuda.so
+
+     # Add this directory to the container's dynamic linker cache
+     echo "/usr/local/cuda/compat/lib" > /etc/ld.so.conf.d/cuda-compat.conf
+     ldconfig
+
+     # Install dependencies
      export PIP_NO_CACHE_DIR=1
      pip install numpy==1.26.4 
      pip install huggingface_hub==0.36.0 --no-deps
@@ -50,7 +60,10 @@ From: $CONTAINER_URL
      pip install wandb==0.22.3 
 
 %environment
-    export LD_PRELOAD=
+     # Prevent Python from using user site-packages from /home/<user>/.local
+     export PYTHONNOUSERSITE=1
+     # Prevent xalt bind
+     export LD_PRELOAD=
 
 EOF
 
