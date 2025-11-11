@@ -66,7 +66,7 @@ By default, the container will be stored on your project space in the `container
 
 For the experiments, the 10BT shard from HuggingFace's [FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb) dataset is used. To download the dataset:
 ```bash
-CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-04.sif
+CONTAINER=$PROJECT_SPACE/containers/megatron-torch-2.7-nvcr.25-10.sif
 BIND_PATH=$PROJECT_SPACE
 
 apptainer shell -B $BIND_PATH $CONTAINER

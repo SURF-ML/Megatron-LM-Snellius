@@ -36,11 +36,18 @@ From: $CONTAINER_URL
      mkdir /usr/local/cuda/compat/lib/
      ln -s /usr/local/cuda/compat/lib.real /usr/local/cuda/compat/lib
      export PIP_NO_CACHE_DIR=1
-     pip install nltk wandb datasets
-     pip install transformers -v --no-deps
-     pip install tokenizers sentencepiece protobuf tqdm regex pyyaml huggingface_hub --no-deps
      pip install numpy==1.26.4 
-     pip install huggingface_hub==0.36.0
+     pip install huggingface_hub==0.36.0 --no-deps
+     pip install transformers==4.57.1 --no-deps
+     pip install tokenizers==0.22.1 --no-deps
+     pip install datasets==4.4.1 --no-deps
+     pip install sentencepiece==0.2.1 --no-deps
+     pip install protobuf==6.33.0 --no-deps
+     pip install tqdm=4.67.1 --no-deps
+     pip install regex==2025.9.18 --no-deps
+     pip install pyyaml==6.0.3 --no-deps
+     pip install nltk==3.9.2 
+     pip install wandb==0.22.3 
 
 %environment
     export LD_PRELOAD=

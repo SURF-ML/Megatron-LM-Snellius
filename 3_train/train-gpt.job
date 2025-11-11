@@ -108,7 +108,7 @@ TENSORBOARD_DIR="$OUTPUT_DIR/tensorboard/$SLURM_JOB_NAME-$SLURM_JOBID"
 mkdir -p "$OUTPUT_DIR" "$CHECKPOINT_PATH"    # This needs to exist
 
 # Script that is used to launch on GPU nodes
-LAUNCH_SCRIPT="$BASE_DIR/launch.sh"
+LAUNCH_SCRIPT="launch.sh"
 
 # Needed for sequence paralellism
 # (see https://github.com/NVIDIA/Megatron-LM/issues/533)
@@ -369,7 +369,7 @@ CHECKPOINT_ARGS=(
 )
 
 COMMAND=" \
-    Megatron-LM/pretrain_gpt.py \
+    ../Megatron-LM/pretrain_gpt.py \
     "${MODEL_ARGS[@]}" \
     "${OPTIMIZER_ARGS[@]}" \
     "${PARALLEL_ARGS[@]}" \
