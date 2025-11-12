@@ -20,7 +20,6 @@ git clone https://github.com/SURF-ML/Megatron-LM-Snellius
 
 Please ensure that you obtain the following file hierarchy:
 
-
 ```
 root (you are here)/
 ├── 0_build_container/ --- build the container
@@ -30,10 +29,18 @@ root (you are here)/
 ├── Megatron-LM/ --------- Megatron-LM codebase submodule
 ```
 
-if the `Megatron-LM` directory is empty you can download the code following:
+If the `Megatron-LM` directory is empty you can download the code following:
 
 ```bash
-git submodule update --init --recursive
+git submodule update --init
+```
+
+Megatron LM is actively developped and breaking changes might be introduced in the library. To avoid using those changes you can checkout a particular commit of the library. If you encounter any issues with the Megatron library try the following steps:
+
+```bash
+cd Megatron-LM
+git checkout 1f6cde85d23ff0c307a47bbdd8bfd778b95a161f
+cd ../
 ```
 
 ## Environment variable
