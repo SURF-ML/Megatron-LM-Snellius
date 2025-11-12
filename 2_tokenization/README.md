@@ -8,4 +8,10 @@ To preprocess the data use the following
 sbatch tokenization.job
 ```
 
-The output is an index file (idx) and the binary (bin) of the tokenizer model
+The output is an index file (idx) and the binary (bin) of the tokenizer model.
+
+As before, don't forget to edit the job file with the path of your project space:
+
+```bash
+export PROJECT_SPACE=/projects/0/prjsXXXX
+```
