@@ -9,7 +9,9 @@
 CONTAINER_URL=nvcr.io/nvidia/pytorch:25.10-py3
 CONTAINER_NAME=megatron-torch-2.7-nvcr.25-10.sif
 
-PROJECT_SPACE=
+# enter your project space path e.g. PROJECT_SPACE=/projects/0/prjsXXXX
+# if you didn't add the path to your bashrc
+# PROJECT_SPACE=
 
 if [ -z "$PROJECT_SPACE" ]; then
   echo "Error: PROJECT_SPACE is not set. Please set the project space path in this script. Example: export PROJECT_SPACE=/projects/0/prjsXXXX"
