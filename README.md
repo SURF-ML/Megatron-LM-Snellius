@@ -11,7 +11,6 @@ A few Snellius-specific pointers:
 
 
 ## Code setup
-- Estimated time: 5 minutes
 
 To run this tutorial you must clone this repository in your home directory
 
@@ -38,7 +37,6 @@ git submodule update --init --recursive
 ```
 
 ## Environment variable
-- Estimated time: 5 minutes
 
 Most of the script in the tutorial will ask you to specify the path to your project space. This path can be added in the bash file as:
 ```bash

@@ -55,7 +55,7 @@ From: $CONTAINER_URL
      pip install datasets==4.4.1 --no-deps
      pip install sentencepiece==0.2.1 --no-deps
      pip install protobuf==6.33.0 --no-deps
-     pip install tqdm=4.67.1 --no-deps
+     pip install tqdm==4.67.1 --no-deps
      pip install regex==2025.9.18 --no-deps
      pip install pyyaml==6.0.3 --no-deps
      pip install nltk==3.9.2 
