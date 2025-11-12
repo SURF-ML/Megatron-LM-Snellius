@@ -10,14 +10,6 @@ A few Snellius-specific pointers:
 - Operating system: Red Hat Enterprise Linux 9.4 (Plow)
 
 
-The tutorial consists of 4 main parts:
-- [Building the container](0_build_container/README.md)
-- [Download the data](1_download_data/README.md)
-- [Tokenization of the data](2_tokenization/README.md)
-- [Train the model](3_train/README.md)
-
-
-
 ## Code setup
 - Estimated time: 5 minutes
 
@@ -59,6 +51,15 @@ You can also export this path in your .bashrc to have the project space persiste
 echo 'export PROJECT_SPACE=/projects/0/prjsXXXX' >> ~/.bashrc
 source ~/.bashrc
 ```
+
+## Structure of the tutorial 
+
+The tutorial consists of 4 parts:
+
+- [Building the container](0_build_container/README.md)
+- [Download the data](1_download_data/README.md)
+- [Tokenization of the data](2_tokenization/README.md)
+- [Train the model](3_train/README.md)
 
 
 
